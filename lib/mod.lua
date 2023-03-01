@@ -19,10 +19,19 @@ local state = {
   x = 0,
   y = 0,
   z = 0,
+  original_enc_fn = nil,
+  current_param = nil,
 }
 
 -- make this a data structure that maps the menu
 local grid_params = {}
+
+local param_enc_fn = function(n, d)
+  if n == 1 then
+    print("modifying param enc: " .. d)
+    params:lookup_param(state.x + ((state.y-1) * 8)):delta(d)
+  end
+end
 
 
 local grid_key_evt = function(x, y, z)
@@ -32,7 +41,21 @@ local grid_key_evt = function(x, y, z)
   state.x = x
   state.y = y
   state.z = z
+  if z == 0 and state.original_enc_fn ~= nil then
+	_norns.enc = state.original_enc_fn
+  else
+	state.original_enc_fn = _norns.enc
+	_norns.enc = param_enc_fn
 
+	-- params:lookup_param(i)
+
+-- 	tab.print(p)
+	-- if p.allow_pmap then
+		-- table.insert(grid_params, p)
+	-- end
+
+-- 	end
+  end
 end
 
 --
@@ -135,16 +158,20 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 	  _norns.screen_update()
 	  if state.z > 0 then
 
-		  print(state.x + ((state.y-1) * 8))
-		  _norns.screen_rect(31,33,66,18)
+		  -- idx
+		  -- print(state.x + ((state.y-1) * 8))
+		  local p = params:lookup_param(state.x + ((state.y-1) * 8))
+		  text = p.name .. ": " .. string.format("%.4f", p.raw)
+		  _norns.screen_rect(31-16,33,66+32,18)
 		  _norns.screen_level(15)
 		  _norns.screen_fill()
-		  _norns.screen_rect(32,34,64,16)
+		  _norns.screen_rect(32-16,34,64+32,16)
 		  _norns.screen_level(0)
 		  _norns.screen_fill()
 		  _norns.screen_move(64,45)
 		  _norns.screen_level(15)
-		  _norns.screen_text_center(params:lookup_param(state.x + ((state.y-1) * 8)).name)
+		  -- _norns.screen_text_center(p.name .. ": " .. string.format("%.4f", p.raw))
+		  _norns.screen_text_center(text)
 		  _norns.screen_update()
 	  end
   end
