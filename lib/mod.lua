@@ -18,8 +18,22 @@ local music = require 'musicutil'
 local state = {
   x = 0,
   y = 0,
+  z = 0,
 }
 
+-- make this a data structure that maps the menu
+local grid_params = {}
+
+
+local grid_key_evt = function(x, y, z)
+  print(x,y,z)
+  state.grid_device:led(x,y,z*15)
+  state.grid_device:refresh()
+  state.x = x
+  state.y = y
+  state.z = z
+
+end
 
 --
 -- [optional] hooks are essentially callbacks which can be used by multiple mods
@@ -61,27 +75,85 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 	-- init_params()
 	-- update_midi_out_device_by_index(1)
 	state.grid_device = grid.connect(4)
-	state.grid_device.key = function(x,y,z)
-		print(x,y,z)
-		state.grid_device:led(x,y,z*15)
-		state.grid_device:refresh()
-	end
+	state.grid_device.key = grid_key_evt
 	-- init_params()
 	-- params:set("gridkeys_midi_mode", 3)
       else
 	print("mod - paramtrix - clear at script stop / pre-start")
 	-- script_init_grid()
 	state.grid_device = grid.connect(4)
-	state.grid_device.key = function(x,y,z)
-		print(x,y,z)
-		state.grid_device:led(x,y,z*15)
-		state.grid_device:refresh()
-	end
+	state.grid_device.key = grid_key_evt
 	-- init_params()
 	-- params:set('paramtrix_active', 2)
 	-- params:bang()
       end
     end
+
+    grid_params = {}
+
+    for i=1,params.count do
+	local p = params:lookup_param(i)
+	tab.print(p)
+	if p.allow_pmap then
+		table.insert(grid_params, p)
+	end
+    end
+
+
+  -- replace the default update function
+  -- screen.update_default = function()
+  -- end
+
+  -- patch screensaver metro event handler to continue
+  -- updating NDI after screensaver activates
+  -- local original_ss_event = metro[36].event
+  -- metro[36].event = function()
+    -- original_ss_event()
+    -- screen.update = function()
+      -- ndi_mod.update()
+    -- end
+  -- end
+
+  -- clients get confused if norns starts up NDI too quickly
+  -- after a restart, so delay it until the first screen update
+  -- XXX don't need the ndi blocking probably unless there's
+  -- some lazy parameter stuff happening
+  -- screen.update = function()
+    -- ndi_mod.init()
+    -- ndi_mod.start()
+    -- screen.update = screen.update_default
+    -- screen.update()
+--     _norns.screen_update()
+
+  --   screen.move(64,40)
+    -- screen.text_center(state.active_button.x .. "/" .. state.active_button.y .. "/" .. state.active_button.z)
+--     screen.update()
+  -- end
+  --
+  screen.update_default = function()
+
+	  _norns.screen_update()
+	  if state.z > 0 then
+
+		  print(state.x + ((state.y-1) * 8))
+		  _norns.screen_rect(31,33,66,18)
+		  _norns.screen_level(15)
+		  _norns.screen_fill()
+		  _norns.screen_rect(32,34,64,16)
+		  _norns.screen_level(0)
+		  _norns.screen_fill()
+		  _norns.screen_move(64,45)
+		  _norns.screen_level(15)
+		  _norns.screen_text_center(params:lookup_param(state.x + ((state.y-1) * 8)).name)
+		  _norns.screen_update()
+	  end
+  end
+
+  screen.update = function()
+	  screen.update = screen.update_default
+	  screen.update()
+  end
+
 end)
 
 
