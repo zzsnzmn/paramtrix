@@ -21,10 +21,40 @@ local state = {
   z = 0,
   original_enc_fn = nil,
   current_param = nil,
+  active_group = 1,
+  groups = {},
 }
+
+-- local function build_page()
+  -- page = {}
+--   local i = 1
+--   repeat
+  --   if params:visible(i) then table.insert(page, i) end
+--     if params:t(i) == params.tGROUP then
+--       i = i + params:get(i) + 1
+--     else i = i + 1 end
+--   until i > params.count
+--   j = 0
+ --  for i=1,params.count do
+  --   if params:t(i) == params.tGROUP then
+   --    j = j + 1
+    --   table.insert(state.pages, page)
+   --  elseif params:visible(i) then 
+    --   table.insert(state.pages[j], i) 
+   --  end
+ --  end
+-- end
 
 -- make this a data structure that maps the menu
 local grid_params = {}
+
+local grid_redraw = function()
+  if state.grid_device ~= nil then 
+    state.grid_device:all(0)
+    state.grid_device:led(state.active_group, 1, 15)
+    state.grid_device:refresh()
+  end
+end
 
 local param_enc_fn = function(n, d)
   if n == 1 then
@@ -36,16 +66,22 @@ end
 
 local grid_key_evt = function(x, y, z)
   print(x,y,z)
-  state.grid_device:led(x,y,z*15)
-  state.grid_device:refresh()
+  -- state.grid_device:led(x,y,z*15)
+  -- state.grid_device:refresh()
   state.x = x
   state.y = y
   state.z = z
+  
+  if y == 1 then
+    print(state.active_group)
+    state.active_group = x
+  end
+  
   if z == 0 and state.original_enc_fn ~= nil then
-	_norns.enc = state.original_enc_fn
+  	_norns.enc = state.original_enc_fn
   else
-	state.original_enc_fn = _norns.enc
-	_norns.enc = param_enc_fn
+  	state.original_enc_fn = _norns.enc
+  	_norns.enc = param_enc_fn
 
 	-- params:lookup_param(i)
 
@@ -56,26 +92,12 @@ local grid_key_evt = function(x, y, z)
 
 -- 	end
   end
+  grid_redraw()
 end
-
---
--- [optional] hooks are essentially callbacks which can be used by multiple mods
--- at the same time. each function registered with a hook must also include a
--- name. registering a new function with the name of an existing function will
--- replace the existing function. using descriptive names (which include the
--- name of the mod itself) can help debugging because the name of a callback
--- function will be printed out by matron (making it visible in maiden) before
--- the callback function is called.
---
--- here we have dummy functionality to help confirm things are getting called
--- and test out access to mod level state via mod supplied fuctions.
---
 
 mod.hook.register("script_pre_init", "paramtrix_pre_init", function()
   -- tweak global environment here ahead of the script `init()` function being called
 end)
-
-
 
 --- when no script gets loaded, activate gridkeys
 --- this happens on system (re)start and script stop
@@ -122,6 +144,9 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 	end
     end
 
+  GRID_WIDTH = 16
+
+
 
   -- replace the default update function
   -- screen.update_default = function()
@@ -156,10 +181,12 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
   screen.update_default = function()
 
 	  _norns.screen_update()
+	  
+	  
+    grid_redraw()
+	  
+	  
 	  if state.z > 0 then
-
-		  -- idx
-		  -- print(state.x + ((state.y-1) * 8))
 		  local p = params:lookup_param(state.x + ((state.y-1) * 8))
 		  text = p.name .. ": " .. string.format("%.4f", p.raw)
 		  _norns.screen_rect(31-16,33,66+32,18)
@@ -174,6 +201,8 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 		  _norns.screen_text_center(text)
 		  _norns.screen_update()
 	  end
+	  state.grid_device:refresh() 
+	  
   end
 
   screen.update = function()
