@@ -22,59 +22,91 @@ local state = {
   original_enc_fn = nil,
   current_param = nil,
   active_group = 1,
+  total_groups = 0,
+  btn_press_idx = 0, -- keeps the index of what param if any is active
   groups = {},
+  params = {}, -- pages is group param id -> table of params
 }
-
--- local function build_page()
-  -- page = {}
---   local i = 1
---   repeat
-  --   if params:visible(i) then table.insert(page, i) end
---     if params:t(i) == params.tGROUP then
---       i = i + params:get(i) + 1
---     else i = i + 1 end
---   until i > params.count
---   j = 0
- --  for i=1,params.count do
-  --   if params:t(i) == params.tGROUP then
-   --    j = j + 1
-    --   table.insert(state.pages, page)
-   --  elseif params:visible(i) then 
-    --   table.insert(state.pages[j], i) 
-   --  end
- --  end
--- end
 
 -- make this a data structure that maps the menu
 local grid_params = {}
 
+local grid_redraw_group_params = function()
+  -- print("ouch")
+  for i,v in ipairs(state.params) do 
+    state.grid_device:led(i, 2, 8)
+  end
+end
+
 local grid_redraw = function()
   if state.grid_device ~= nil then 
     state.grid_device:all(0)
-    state.grid_device:led(state.active_group, 1, 15)
+    state.groups = {} 
+    state.total_groups = 0
+    local j = 0
+    for i=1,params.count do
+      if params:t(i) == params.tGROUP then
+        table.insert(state.groups, i)
+        state.total_groups = state.total_groups + 1
+        j = j + 1
+        state.grid_device:led(j, 1, 12)
+      end
+      -- if params:visible(i) then table.insert(state.pages[j], i) end
+    end
+    
+    state.grid_device:led(state.active_group, 1, 8)
+    
+    grid_redraw_group_params()
+    
     state.grid_device:refresh()
   end
 end
 
 local param_enc_fn = function(n, d)
   if n == 1 then
-    print("modifying param enc: " .. d)
-    params:lookup_param(state.x + ((state.y-1) * 8)):delta(d)
+    -- print("modifying param enc: " .. d)
+    if state.btn_press_idx > 0 then 
+      params:lookup_param(state.params[state.btn_press_idx]):delta(d)
+    end
   end
 end
 
 
 local grid_key_evt = function(x, y, z)
-  print(x,y,z)
-  -- state.grid_device:led(x,y,z*15)
-  -- state.grid_device:refresh()
-  state.x = x
-  state.y = y
-  state.z = z
-  
-  if y == 1 then
-    print(state.active_group)
+  -- print(x,y,z)
+  if y == 1 and z == 1 then
+    -- if state.total_groups <= x then
     state.active_group = x
+    -- end
+    state.params = {} 
+    _end = state.groups[x+1] or params.count
+    _start = state.groups[x] or 0
+    for i=_start,_end do
+      if params:visible(i) then table.insert(state.params, i) end
+      -- if params:visible(i) then table.insert(state.pages[j], i) end
+    end
+    
+    -- print("active_group:" .. state.active_group)
+    -- print("active_group_id:" .. state.groups[state.active_group])
+    -- print("btn_idx:" .. state.btn_press_idx)
+    -- print("pages: " .. state.pages[state.active_group])
+    -- for i=state.groups[state.active_group],
+  end
+  
+  if y >= 2 then
+    -- TODO: convert button press to idx for active groups
+    -- TODO: turn on leds for params when switching groups
+    -- 
+    local _y = y - 2
+    state.btn_press_idx = x + (_y * 16)
+    
+    -- print("btn_press_idx: " .. state.btn_press_idx)
+    -- print("group: " .. state.groups[state.active_group])
+    -- print("params: " .. state.params)
+    -- tab.print(state.params)
+    state.x = x
+    state.y = y
+    state.z = z
   end
   
   if z == 0 and state.original_enc_fn ~= nil then
@@ -92,6 +124,7 @@ local grid_key_evt = function(x, y, z)
 
 -- 	end
   end
+  -- print(state.total_groups)
   grid_redraw()
 end
 
@@ -105,32 +138,22 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
     state.system_post_startup = true
     local script_clear = script.clear
     script.clear = function()
-
       local is_restart = (tabutil.count(params.lookup) == 0)
-
-      -- if state.grid_device ~= nil then
-      --   restore_grid_initial_state()
-      -- end
 
       script_clear()
 
       if is_restart then
-	print("mod - paramtrix - clear at (re)start")
-	-- startup_init_grid()
-	-- init_params()
-	-- update_midi_out_device_by_index(1)
-	state.grid_device = grid.connect(4)
-	state.grid_device.key = grid_key_evt
-	-- init_params()
-	-- params:set("gridkeys_midi_mode", 3)
+      -- 	print("mod - paramtrix - clear at (re)start")
+      	state.grid_device = grid.connect(4)
+      	state.grid_device.key = grid_key_evt
       else
-	print("mod - paramtrix - clear at script stop / pre-start")
-	-- script_init_grid()
-	state.grid_device = grid.connect(4)
-	state.grid_device.key = grid_key_evt
-	-- init_params()
-	-- params:set('paramtrix_active', 2)
-	-- params:bang()
+      -- 	print("mod - paramtrix - clear at script stop / pre-start")
+      	-- script_init_grid()
+      	state.grid_device = grid.connect(4)
+      	state.grid_device.key = grid_key_evt
+      	-- init_params()
+      	-- params:set('paramtrix_active', 2)
+      	-- params:bang()
       end
     end
 
@@ -138,46 +161,13 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 
     for i=1,params.count do
 	local p = params:lookup_param(i)
-	tab.print(p)
+-- 	tab.print(p)
 	if p.allow_pmap then
 		table.insert(grid_params, p)
 	end
     end
 
   GRID_WIDTH = 16
-
-
-
-  -- replace the default update function
-  -- screen.update_default = function()
-  -- end
-
-  -- patch screensaver metro event handler to continue
-  -- updating NDI after screensaver activates
-  -- local original_ss_event = metro[36].event
-  -- metro[36].event = function()
-    -- original_ss_event()
-    -- screen.update = function()
-      -- ndi_mod.update()
-    -- end
-  -- end
-
-  -- clients get confused if norns starts up NDI too quickly
-  -- after a restart, so delay it until the first screen update
-  -- XXX don't need the ndi blocking probably unless there's
-  -- some lazy parameter stuff happening
-  -- screen.update = function()
-    -- ndi_mod.init()
-    -- ndi_mod.start()
-    -- screen.update = screen.update_default
-    -- screen.update()
---     _norns.screen_update()
-
-  --   screen.move(64,40)
-    -- screen.text_center(state.active_button.x .. "/" .. state.active_button.y .. "/" .. state.active_button.z)
---     screen.update()
-  -- end
-  --
   screen.update_default = function()
 
 	  _norns.screen_update()
@@ -187,8 +177,11 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
 	  
 	  
 	  if state.z > 0 then
-		  local p = params:lookup_param(state.x + ((state.y-1) * 8))
-		  text = p.name .. ": " .. string.format("%.4f", p.raw)
+		  local p = params:lookup_param(state.params[state.btn_press_idx])
+		  -- print(state.btn_press_idx)
+		  -- tab.print(state.params)
+		  -- text = p.name .. ": " .. string.format("%.4f", p.raw)
+		  text = p.name .. ": " -- .. p.raw or ""
 		  _norns.screen_rect(31-16,33,66+32,18)
 		  _norns.screen_level(15)
 		  _norns.screen_fill()
