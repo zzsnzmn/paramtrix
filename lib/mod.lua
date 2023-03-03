@@ -34,7 +34,9 @@ local grid_params = {}
 local grid_redraw_group_params = function()
   -- print("ouch")
   for i,v in ipairs(state.params) do 
-    state.grid_device:led(i, 2, 8)
+    if params:t(v) ~= params.tGROUP then
+      state.grid_device:led(i, 2, 8)
+    end
   end
 end
 
@@ -82,7 +84,7 @@ local grid_key_evt = function(x, y, z)
     _end = state.groups[x+1] or params.count
     _start = state.groups[x] or 0
     for i=_start,_end do
-      if params:visible(i) then table.insert(state.params, i) end
+      if params:visible(i) and params:t(i) ~= params.tGROUP then table.insert(state.params, i) end
       -- if params:visible(i) then table.insert(state.pages[j], i) end
     end
     
@@ -176,12 +178,19 @@ mod.hook.register("system_post_startup", "paramtrix_post_system_startup", functi
     grid_redraw()
 	  
 	  
-	  if state.z > 0 then
+	  if state.z > 0 and params:t(state.btn_press_idx) ~= params.tGROUP then
 		  local p = params:lookup_param(state.params[state.btn_press_idx])
 		  -- print(state.btn_press_idx)
 		  -- tab.print(state.params)
-		  -- text = p.name .. ": " .. string.format("%.4f", p.raw)
-		  text = p.name .. ": " -- .. p.raw or ""
+	  -- text = p.name .. ": " .. string.format("%.2f", p.raw)
+
+		  
+      if params:t(state.btn_press_idx) ~= params.tGROUP then
+  		  -- text = p.name .. ": " .. p.raw or ""
+	      text = p.name .. ": " .. string.format("%.2f", p.raw)
+      else
+  		  text = p.name .. ": " -- .. p.raw or ""
+      end
 		  _norns.screen_rect(31-16,33,66+32,18)
 		  _norns.screen_level(15)
 		  _norns.screen_fill()
